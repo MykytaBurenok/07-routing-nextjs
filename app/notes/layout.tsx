@@ -1,16 +1,14 @@
-import { ReactNode } from "react";
-
 export default function Layout({
   children,
   modal,
 }: {
-  children: ReactNode;
-  modal?: ReactNode;
+  children: React.ReactNode;
+  modal?: React.ReactNode;
 }) {
   return (
     <>
       {children}
-      {modal}
+      {modal ?? null}
     </>
   );
 }
