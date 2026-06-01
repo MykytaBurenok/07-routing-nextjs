@@ -1,9 +1,11 @@
-export default function NotesLayout({
+import { ReactNode } from "react";
+
+export default function Layout({
   children,
   modal,
 }: {
-  children: React.ReactNode;
-  modal: React.ReactNode;
+  children: ReactNode;
+  modal?: ReactNode;
 }) {
   return (
     <>
