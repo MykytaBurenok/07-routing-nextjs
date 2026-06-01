@@ -1,41 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
-type Note = {
+import type { Note } from "@/types/note";
+import Modal from "@/components/Modal/Modal";
+
+type Props = {
   id: string;
-  title: string;
-  content: string;
 };
 
-export default function NotePreviewClient({ id }: { id: string }) {
-  const [note, setNote] = useState<Note | null>(null);
-  const [loading, setLoading] = useState(true);
+async function fetchNoteById(id: string): Promise<Note> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notes/${id}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
 
-  useEffect(() => {
-    async function fetchNote() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/notes/${id}`);
-        const data = await res.json();
-        setNote(data);
-      } catch (e) {
-        console.error("Failed to load note", e);
-      } finally {
-        setLoading(false);
-      }
-    }
+  if (!res.ok) {
+    throw new Error("Failed to load note");
+  }
 
-    if (id) fetchNote();
-  }, [id]);
+  return res.json();
+}
 
-  if (loading) return <div>Loading...</div>;
-  if (!note) return <div>Note not found</div>;
+export default function NotePreviewClient({ id }: Props) {
+  const router = useRouter();
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["note", id],
+    queryFn: () => fetchNoteById(id),
+    refetchOnMount: false,
+  });
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold">{note.title}</h2>
-      <p className="mt-2 whitespace-pre-wrap">{note.content}</p>
-    </div>
+    <Modal onClose={() => router.back()}>
+      {isLoading && <p>Loading note...</p>}
+
+      {isError && <p>{(error as Error).message || "Failed to load note."}</p>}
+
+      {!isLoading && !isError && data && (
+        <article>
+          <h2>{data.title}</h2>
+          <p>{data.content}</p>
+          <p>Tag: {data.tag}</p>
+          <p>Created: {new Date(data.createdAt).toLocaleString()}</p>
+        </article>
+      )}
+    </Modal>
   );
 }
