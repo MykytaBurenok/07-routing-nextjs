@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useReducer } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 
@@ -20,7 +20,60 @@ type Props = {
   tag: string;
 };
 
+type State = {
+  currentPage: number;
+  search: string;
+  isModalOpen: boolean;
+  currentTag: string;
+};
+
+type Action =
+  | { type: "setSearch"; payload: string }
+  | { type: "setPage"; payload: number }
+  | { type: "openModal" }
+  | { type: "closeModal" }
+  | { type: "setTag"; payload: string };
+
 const PER_PAGE = 12;
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "setSearch":
+      return {
+        ...state,
+        search: action.payload,
+        currentPage: 1,
+      };
+
+    case "setPage":
+      return {
+        ...state,
+        currentPage: action.payload,
+      };
+
+    case "openModal":
+      return {
+        ...state,
+        isModalOpen: true,
+      };
+
+    case "closeModal":
+      return {
+        ...state,
+        isModalOpen: false,
+      };
+
+    case "setTag":
+      return {
+        ...state,
+        currentTag: action.payload,
+        currentPage: 1,
+      };
+
+    default:
+      return state;
+  }
+}
 
 async function fetchNotes({
   page,
@@ -60,21 +113,35 @@ async function fetchNotes({
 }
 
 export default function NotesClient({ tag }: Props) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [inputValue, setInputValue] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [state, dispatch] = useReducer(reducer, {
+    currentPage: 1,
+    search: "",
+    isModalOpen: false,
+    currentTag: tag,
+  });
 
-  const [debouncedSearch] = useDebounce(inputValue, 300);
+  const [debouncedSearch] = useDebounce(state.search, 300);
 
-  const effectivePage = debouncedSearch || tag !== "all" ? 1 : currentPage;
+  useEffect(() => {
+    if (state.currentTag !== tag) {
+      dispatch({ type: "setTag", payload: tag });
+    }
+  }, [tag, state.currentTag]);
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["notes", { page: effectivePage, search: debouncedSearch, tag }],
+    queryKey: [
+      "notes",
+      {
+        page: state.currentPage,
+        search: debouncedSearch,
+        tag: state.currentTag,
+      },
+    ],
     queryFn: () =>
       fetchNotes({
-        page: effectivePage,
+        page: state.currentPage,
         search: debouncedSearch,
-        tag,
+        tag: state.currentTag,
       }),
     placeholderData: (previousData) => previousData,
   });
@@ -93,8 +160,14 @@ export default function NotesClient({ tag }: Props) {
           marginBottom: "24px",
         }}
       >
-        <SearchBox value={inputValue} onChange={setInputValue} />
-        <button type="button" onClick={() => setIsModalOpen(true)}>
+        <SearchBox
+          value={state.search}
+          onChange={(value: string) =>
+            dispatch({ type: "setSearch", payload: value })
+          }
+        />
+
+        <button type="button" onClick={() => dispatch({ type: "openModal" })}>
           Create note
         </button>
       </div>
@@ -109,14 +182,17 @@ export default function NotesClient({ tag }: Props) {
 
       {totalPages > 1 && (
         <Pagination
-          currentPage={effectivePage}
+          currentPage={state.currentPage}
           totalPages={totalPages}
-          onPageChange={setCurrentPage}
+          onPageChange={(page: number) =>
+            dispatch({ type: "setPage", payload: page })
+          }
         />
       )}
-      {isModalOpen && (
-        <Modal onClose={() => setIsModalOpen(false)}>
-          <NoteForm onClose={() => setIsModalOpen(false)} />
+
+      {state.isModalOpen && (
+        <Modal onClose={() => dispatch({ type: "closeModal" })}>
+          <NoteForm onClose={() => dispatch({ type: "closeModal" })} />
         </Modal>
       )}
     </section>
